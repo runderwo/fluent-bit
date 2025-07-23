@@ -138,6 +138,9 @@ struct flb_aws_client_generator {
 /* Remove protocol from endpoint */
 char *removeProtocol (char *endpoint, char *protocol);
 
+/* Parse endpoint and port out of a colon-separated pair. */
+int parseEndpoint (char *endpoint, char **host, int *port, int default_port);
+
 /* Get the flb_aws_client_generator */
 struct flb_aws_client_generator *flb_aws_client_generator();
 

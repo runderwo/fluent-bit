@@ -88,11 +88,10 @@ struct flb_firehose {
     const char *external_id;
     char *sts_endpoint;
     char *profile;
-    int custom_endpoint;
     int retry_requests;
     int compression;
 
-    /* must be freed on shutdown if custom_endpoint is not set */
+    /* must be freed on shutdown */
     char *endpoint;
 
     /* Plugin output instance reference */

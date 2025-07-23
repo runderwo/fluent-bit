@@ -106,13 +106,13 @@ static int cb_firehose_init(struct flb_output_instance *ins,
         goto error;
     }
 
+    int port = 443;
     tmp = flb_output_get_property("endpoint", ins);
     if (tmp) {
-        ctx->custom_endpoint = FLB_TRUE;
-        ctx->endpoint = removeProtocol((char *) tmp, "https://");
-    }
-    else {
-        ctx->custom_endpoint = FLB_FALSE;
+        if (parseEndpoint(removeProtocol((char *) tmp, "https://"), &ctx->endpoint, &port, port) < 0) {
+            flb_plg_error(ctx->ins, "Failed to parse Kinesis Firehose endpoint: %s", tmp);
+            goto error;
+        }
     }
 
     tmp = flb_output_get_property("sts_endpoint", ins);
@@ -266,7 +266,7 @@ static int cb_firehose_init(struct flb_output_instance *ins,
     ctx->firehose_client->static_headers_len = 1;
 
     struct flb_upstream *upstream = flb_upstream_create(config, ctx->endpoint,
-                                                        443, FLB_IO_TLS,
+                                                        port, FLB_IO_TLS,
                                                         ctx->client_tls);
     if (!upstream) {
         flb_plg_error(ctx->ins, "Connection initialization error");
@@ -380,10 +380,7 @@ void flb_firehose_ctx_destroy(struct flb_firehose *ctx)
             flb_aws_client_destroy(ctx->firehose_client);
         }
 
-        if (ctx->custom_endpoint == FLB_FALSE) {
-            flb_free(ctx->endpoint);
-        }
-
+        flb_free(ctx->endpoint);
         flb_free(ctx);
     }
 }

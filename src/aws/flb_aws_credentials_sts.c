@@ -80,7 +80,6 @@ static flb_sds_t get_node(char *cred_node, char* node_name, int node_name_len, c
  * and assume an IAM Role.
  */
 struct flb_aws_provider_sts {
-    int custom_endpoint;
     struct flb_aws_provider *base_provider;
 
     struct flb_aws_credentials *creds;
@@ -263,10 +262,7 @@ void destroy_fn_sts(struct flb_aws_provider *provider) {
             flb_sds_destroy(implementation->uri);
         }
 
-        if (implementation->custom_endpoint == FLB_FALSE) {
-            flb_free(implementation->endpoint);
-        }
-
+        flb_free(implementation->endpoint);
         flb_free(implementation);
         provider->implementation = NULL;
     }
@@ -324,13 +320,15 @@ struct flb_aws_provider *flb_sts_provider_create(struct flb_config *config,
         goto error;
     }
 
+    int port = 443;
     if (sts_endpoint) {
-        implementation->endpoint = removeProtocol(sts_endpoint, "https://");
-        implementation->custom_endpoint = FLB_TRUE;
+        if (parseEndpoint(removeProtocol(sts_endpoint, "https://"), &implementation->endpoint, &port, port) < 0) {
+            flb_error("Failed to parse STS endpoint: %s", sts_endpoint);
+            goto error;
+        }
     }
     else {
         implementation->endpoint = flb_aws_endpoint("sts", region);
-        implementation->custom_endpoint = FLB_FALSE;
     }
 
     if(!implementation->endpoint) {
@@ -347,7 +345,7 @@ struct flb_aws_provider *flb_sts_provider_create(struct flb_config *config,
     implementation->sts_client->provider = base_provider;
     implementation->sts_client->region = region;
     implementation->sts_client->service = "sts";
-    implementation->sts_client->port = 443;
+    implementation->sts_client->port = port;
     implementation->sts_client->flags = 0;
     implementation->sts_client->proxy = proxy;
 
@@ -381,7 +379,6 @@ error:
  * location of the OIDC token from an environment variable.
  */
 struct flb_aws_provider_eks {
-    int custom_endpoint;
     struct flb_aws_credentials *creds;
     /*
      * Time to auto-refresh creds before they expire. A negative value disables
@@ -537,13 +534,11 @@ void destroy_fn_eks(struct flb_aws_provider *provider) {
             flb_aws_client_destroy(implementation->sts_client);
         }
 
-        if (implementation->custom_endpoint == FLB_FALSE) {
-            flb_free(implementation->endpoint);
-        }
         if (implementation->free_session_name == FLB_TRUE) {
             flb_free(implementation->session_name);
         }
 
+        flb_free(implementation->endpoint);
         flb_free(implementation);
         provider->implementation = NULL;
     }
@@ -621,13 +616,15 @@ struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
         return NULL;
     }
 
+    int port = 443;
     if (sts_endpoint) {
-        implementation->endpoint = removeProtocol(sts_endpoint, "https://");
-        implementation->custom_endpoint = FLB_TRUE;
+        if (parseEndpoint(removeProtocol(sts_endpoint, "https://"), &implementation->endpoint, &port, port) < 0) {
+            flb_error("Failed to parse STS endpoint: %s", sts_endpoint);
+            goto error;
+        }
     }
     else {
         implementation->endpoint = flb_aws_endpoint("sts", region);
-        implementation->custom_endpoint = FLB_FALSE;
     }
 
     if(!implementation->endpoint) {
@@ -644,7 +641,7 @@ struct flb_aws_provider *flb_eks_provider_create(struct flb_config *config,
     implementation->sts_client->provider = NULL;
     implementation->sts_client->region = region;
     implementation->sts_client->service = "sts";
-    implementation->sts_client->port = 443;
+    implementation->sts_client->port = port;
     implementation->sts_client->flags = 0;
     implementation->sts_client->proxy = proxy;
 

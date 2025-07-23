@@ -477,9 +477,7 @@ static void s3_context_destroy(struct flb_s3 *ctx)
         flb_tls_destroy(ctx->client_tls);
     }
 
-    if (ctx->free_endpoint == FLB_TRUE) {
-        flb_free(ctx->endpoint);
-    }
+    flb_free(ctx->endpoint);
 
     if (ctx->buffer_dir) {
         flb_sds_destroy(ctx->buffer_dir);
@@ -523,9 +521,6 @@ static int cb_s3_init(struct flb_output_instance *ins,
     (void) config;
     (void) data;
     char *ep;
-    struct flb_split_entry *tok;
-    struct mk_list *split;
-    int list_size;
 
     ctx = flb_calloc(1, sizeof(struct flb_s3));
     if (!ctx) {
@@ -719,42 +714,16 @@ static int cb_s3_init(struct flb_output_instance *ins,
         else {
           ep = removeProtocol((char *) tmp, "https://");
         }
-
-        split = flb_utils_split((const char *)ep, ':', 1);
-        if (!split) {
-          flb_errno();
-          return -1;
-        }
-        list_size = mk_list_size(split);
-        if (list_size > 2) {
-          flb_plg_error(ctx->ins, "Failed to split endpoint");
-          flb_utils_split_free(split);
-          return -1;
-        }
-
-        tok = mk_list_entry_first(split, struct flb_split_entry, _head);
-        ctx->endpoint = flb_strndup(tok->value, tok->len);
-        if (!ctx->endpoint) {
-            flb_errno();
-            flb_utils_split_free(split);
+        if (parseEndpoint(ep, &ctx->endpoint, &ctx->port, ctx->insecure == FLB_TRUE ? DEFAULT_S3_INSECURE_PORT : DEFAULT_S3_PORT) < 0) {
+            flb_plg_error(ctx->ins, "Failed to parse S3 endpoint: %s", ep);
             return -1;
         }
-        ctx->free_endpoint = FLB_TRUE;
-        if (list_size == 2) {
-          tok = mk_list_entry_next(&tok->_head, struct flb_split_entry, _head, split);
-          ctx->port = atoi(tok->value);
-        }
-        else {
-          ctx->port = ctx->insecure == FLB_TRUE ? DEFAULT_S3_INSECURE_PORT : DEFAULT_S3_PORT;
-        }
-        flb_utils_split_free(split);
     }
     else {
         /* default endpoint for the given region */
         ctx->endpoint = flb_aws_endpoint("s3", ctx->region);
         ctx->insecure = FLB_FALSE;
         ctx->port = DEFAULT_S3_PORT;
-        ctx->free_endpoint = FLB_TRUE;
         if (!ctx->endpoint) {
             flb_plg_error(ctx->ins,  "Could not construct S3 endpoint");
             return -1;

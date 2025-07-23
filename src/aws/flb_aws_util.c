@@ -26,6 +26,7 @@
 #include <fluent-bit/flb_output_plugin.h>
 #include <fluent-bit/flb_jsmn.h>
 #include <fluent-bit/flb_env.h>
+#include <fluent-bit/flb_utils.h>
 
 #include <stdlib.h>
 #include <sys/types.h>
@@ -167,6 +168,40 @@ char *removeProtocol (char *endpoint, char *protocol) {
         endpoint = endpoint + strlen(protocol);
     }
     return endpoint;
+}
+
+int parseEndpoint (char *endpoint, char **host, int *port, int default_port) {
+    struct flb_split_entry *tok;
+    struct mk_list *split;
+    int list_size;
+
+    split = flb_utils_split((const char *)endpoint, ':', 1);
+    if (!split) {
+      flb_errno();
+      return -1;
+    }
+    list_size = mk_list_size(split);
+    if (list_size > 2) {
+      flb_utils_split_free(split);
+      return -1;
+    }
+
+    tok = mk_list_entry_first(split, struct flb_split_entry, _head);
+    *host = flb_strndup(tok->value, tok->len);
+    if (*host == NULL) {
+        flb_errno();
+        flb_utils_split_free(split);
+        return -1;
+    }
+    if (list_size == 2) {
+      tok = mk_list_entry_next(&tok->_head, struct flb_split_entry, _head, split);
+      *port = atoi(tok->value);
+    }
+    else {
+      *port = default_port;
+    }
+    flb_utils_split_free(split);
+    return 0;
 }
 
 
